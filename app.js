@@ -1,5 +1,5 @@
 /**
- * ColdLogic AI - Handwritten Digit Recognizer
+ * ColdLogic - Handwritten Digit Classifier
  * 100% Client-Side Machine Learning Pipeline
  * Compatible with GitHub Pages (Zero Backend)
  */
@@ -22,7 +22,12 @@
     lastX: 0,
     lastY: 0,
     brushSize: 22,
-    debounceTimer: null
+    debounceTimer: null,
+    camera: {
+      stream: null,
+      facingMode: 'environment', // Start with rear/environment camera for paper scanning
+      isActive: false
+    }
   };
 
   // --- DOM Elements ---
@@ -37,9 +42,11 @@
 
     // Tabs
     tabUploadBtn: document.getElementById('tabUploadBtn'),
+    tabCameraBtn: document.getElementById('tabCameraBtn'),
     tabDrawBtn: document.getElementById('tabDrawBtn'),
     tabSamplesBtn: document.getElementById('tabSamplesBtn'),
     paneUpload: document.getElementById('paneUpload'),
+    paneCamera: document.getElementById('paneCamera'),
     paneDraw: document.getElementById('paneDraw'),
     paneSamples: document.getElementById('paneSamples'),
 
@@ -47,6 +54,22 @@
     dropzone: document.getElementById('dropzone'),
     fileInput: document.getElementById('fileInput'),
     browseFileBtn: document.getElementById('browseFileBtn'),
+    quickCameraBtn: document.getElementById('quickCameraBtn'),
+
+    // Camera Pane
+    cameraViewfinder: document.getElementById('cameraViewfinder'),
+    cameraVideo: document.getElementById('cameraVideo'),
+    cameraFlash: document.getElementById('cameraFlash'),
+    cameraIdleOverlay: document.getElementById('cameraIdleOverlay'),
+    cameraStatusText: document.getElementById('cameraStatusText'),
+    cameraStatusSub: document.getElementById('cameraStatusSub'),
+    startCameraBtn: document.getElementById('startCameraBtn'),
+    deviceCameraBtn: document.getElementById('deviceCameraBtn'),
+    nativeCameraInput: document.getElementById('nativeCameraInput'),
+    capturePhotoBtn: document.getElementById('capturePhotoBtn'),
+    flipCameraBtn: document.getElementById('flipCameraBtn'),
+    nativeShutterToolbarBtn: document.getElementById('nativeShutterToolbarBtn'),
+    stopCameraBtn: document.getElementById('stopCameraBtn'),
 
     // Draw Pane
     drawingCanvas: document.getElementById('drawingCanvas'),
@@ -94,6 +117,7 @@
     initModel();
     initTabs();
     initUpload();
+    initCamera();
     initDrawingCanvas();
     initSamples();
     initSettings();
@@ -139,12 +163,15 @@
   function initTabs() {
     const tabs = [
       { btn: elements.tabUploadBtn, pane: elements.paneUpload, id: 'upload' },
+      { btn: elements.tabCameraBtn, pane: elements.paneCamera, id: 'camera' },
       { btn: elements.tabDrawBtn, pane: elements.paneDraw, id: 'draw' },
       { btn: elements.tabSamplesBtn, pane: elements.paneSamples, id: 'samples' }
     ];
 
     tabs.forEach(tab => {
       tab.btn.addEventListener('click', () => {
+        const prevTab = state.activeTab;
+
         tabs.forEach(t => {
           t.btn.classList.remove('active');
           t.btn.setAttribute('aria-selected', 'false');
@@ -155,6 +182,16 @@
         tab.btn.setAttribute('aria-selected', 'true');
         tab.pane.classList.add('active');
         state.activeTab = tab.id;
+
+        // Auto stop camera when leaving camera tab
+        if (prevTab === 'camera' && tab.id !== 'camera') {
+          stopCamera();
+        }
+
+        // Auto start camera when switching to camera tab
+        if (tab.id === 'camera' && !state.camera.isActive) {
+          startCamera();
+        }
 
         if (tab.id === 'draw') {
           processSource(elements.drawingCanvas, 'Live Drawing');
@@ -169,6 +206,13 @@
       e.stopPropagation();
       elements.fileInput.click();
     });
+
+    if (elements.quickCameraBtn) {
+      elements.quickCameraBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.tabCameraBtn.click();
+      });
+    }
 
     elements.dropzone.addEventListener('click', () => {
       elements.fileInput.click();
@@ -214,7 +258,6 @@
           if (item.type.indexOf('image') !== -1) {
             const blob = item.getAsFile();
             handleFile(blob, 'Pasted Clipboard Image');
-            // Switch to upload tab
             elements.tabUploadBtn.click();
             break;
           }
@@ -224,7 +267,7 @@
   }
 
   function handleFile(file, customName) {
-    if (!file.type.startsWith('image/')) {
+    if (!file || !file.type.startsWith('image/')) {
       alert('Please upload a valid image file (PNG, JPG, JPEG, WEBP).');
       return;
     }
@@ -240,12 +283,170 @@
     reader.readAsDataURL(file);
   }
 
+  // --- Live Camera Controller ---
+  function initCamera() {
+    elements.startCameraBtn.addEventListener('click', () => {
+      startCamera();
+    });
+
+    elements.stopCameraBtn.addEventListener('click', () => {
+      stopCamera();
+    });
+
+    elements.flipCameraBtn.addEventListener('click', () => {
+      toggleCameraFlip();
+    });
+
+    elements.capturePhotoBtn.addEventListener('click', () => {
+      captureCameraPhoto();
+    });
+
+    // Native mobile camera fallback triggers
+    const triggerNativeShutter = () => {
+      elements.nativeCameraInput.click();
+    };
+
+    if (elements.deviceCameraBtn) {
+      elements.deviceCameraBtn.addEventListener('click', triggerNativeShutter);
+    }
+    if (elements.nativeShutterToolbarBtn) {
+      elements.nativeShutterToolbarBtn.addEventListener('click', triggerNativeShutter);
+    }
+
+    elements.nativeCameraInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleFile(e.target.files[0], 'Camera Photo');
+      }
+    });
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showCameraError('Camera API Not Supported', 'Your browser does not support WebRTC camera access. Use Phone Shutter instead.');
+      return;
+    }
+
+    elements.cameraStatusText.textContent = 'Connecting Camera...';
+    elements.cameraStatusSub.textContent = 'Please allow browser camera permissions if prompted.';
+
+    // Stop any existing stream
+    if (state.camera.stream) {
+      state.camera.stream.getTracks().forEach(track => track.stop());
+      state.camera.stream = null;
+    }
+
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: state.camera.facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+      } catch (err) {
+        // Fallback to generic video constraint if facingMode constraint fails
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
+      state.camera.stream = stream;
+      state.camera.isActive = true;
+      elements.cameraVideo.srcObject = stream;
+
+      // Adjust mirroring (mirror front/user camera for natural feel)
+      if (state.camera.facingMode === 'user') {
+        elements.cameraVideo.style.transform = 'scaleX(-1)';
+      } else {
+        elements.cameraVideo.style.transform = 'scaleX(1)';
+      }
+
+      elements.cameraVideo.onloadedmetadata = () => {
+        elements.cameraVideo.play();
+        elements.cameraIdleOverlay.classList.add('hidden');
+        elements.capturePhotoBtn.disabled = false;
+      };
+    } catch (err) {
+      console.warn('Camera access denied or failed:', err);
+      showCameraError('Camera Access Denied', 'Camera permission was denied or camera is in use. You can use the Phone Shutter or upload an image.');
+    }
+  }
+
+  function stopCamera() {
+    if (state.camera.stream) {
+      state.camera.stream.getTracks().forEach(track => track.stop());
+      state.camera.stream = null;
+    }
+    state.camera.isActive = false;
+    elements.cameraVideo.srcObject = null;
+    elements.capturePhotoBtn.disabled = true;
+
+    elements.cameraStatusText.textContent = 'Camera Inactive';
+    elements.cameraStatusSub.textContent = 'Activate live camera or use your phone\'s native camera shutter.';
+    elements.cameraIdleOverlay.classList.remove('hidden');
+  }
+
+  function toggleCameraFlip() {
+    state.camera.facingMode = state.camera.facingMode === 'environment' ? 'user' : 'environment';
+    if (state.camera.isActive) {
+      startCamera();
+    }
+  }
+
+  function showCameraError(title, subtitle) {
+    elements.cameraStatusText.textContent = title;
+    elements.cameraStatusSub.textContent = subtitle;
+    elements.cameraIdleOverlay.classList.remove('hidden');
+    elements.capturePhotoBtn.disabled = true;
+  }
+
+  function captureCameraPhoto() {
+    if (!state.camera.isActive || !elements.cameraVideo.videoWidth) {
+      return;
+    }
+
+    // Trigger visual shutter flash
+    elements.cameraFlash.classList.add('flash-active');
+    setTimeout(() => {
+      elements.cameraFlash.classList.remove('flash-active');
+    }, 320);
+
+    const video = elements.cameraVideo;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // Crop to the centered reticle viewfinder area (~60% of the shorter side)
+    // This removes desk clutter and focuses directly on the handwritten digit!
+    const cropSize = Math.round(Math.min(vw, vh) * 0.62);
+    const cropX = Math.round((vw - cropSize) / 2);
+    const cropY = Math.round((vh - cropSize) / 2);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cropSize;
+    canvas.height = cropSize;
+    const ctx = canvas.getContext('2d');
+
+    // Handle user camera mirroring
+    if (state.camera.facingMode === 'user') {
+      ctx.translate(cropSize, 0);
+      ctx.scale(-1, 1);
+    }
+
+    ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+
+    // Send the cropped camera frame straight to the ML pipeline!
+    processSource(canvas, 'Camera Snapshot');
+  }
+
   // --- Interactive Drawing Canvas ---
   function initDrawingCanvas() {
     const canvas = elements.drawingCanvas;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    // Fill with black background
     clearCanvas();
 
     elements.brushSize.addEventListener('input', (e) => {
@@ -314,7 +515,6 @@
       }
     }
 
-    // Pointer / mouse / touch events
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     window.addEventListener('pointerup', stopDrawing);
@@ -429,7 +629,6 @@
       elements.deployModal.close();
     });
 
-    // Close on backdrop click
     elements.deployModal.addEventListener('click', (e) => {
       const rect = elements.deployModal.getBoundingClientRect();
       if (
@@ -491,7 +690,6 @@
     // -------------------------------------------------------------
     // STAGE 2: Grayscale & Contrast Inversion
     // -------------------------------------------------------------
-    // Process on an internal intermediate canvas (e.g. max 280x280)
     const procCanvas = document.createElement('canvas');
     const maxSide = 280;
     const procScale = Math.min(1, maxSide / Math.max(width, height));
@@ -512,7 +710,6 @@
     const ph = procCanvas.height;
 
     for (let x = 0; x < pw; x++) {
-      // top & bottom rows
       const idxTop = (0 * pw + x) * 4;
       const idxBot = ((ph - 1) * pw + x) * 4;
       perimeterSum += (0.299 * data[idxTop] + 0.587 * data[idxTop + 1] + 0.114 * data[idxTop + 2]);
@@ -521,7 +718,6 @@
     }
 
     for (let y = 1; y < ph - 1; y++) {
-      // left & right columns
       const idxLeft = (y * pw + 0) * 4;
       const idxRight = (y * pw + (pw - 1)) * 4;
       perimeterSum += (0.299 * data[idxLeft] + 0.587 * data[idxLeft + 1] + 0.114 * data[idxLeft + 2]);
@@ -531,7 +727,7 @@
 
     const avgPerimeterBrightness = perimeterSum / Math.max(1, perimeterCount);
 
-    // Decision: should we invert?
+    // Inversion decision
     let shouldInvert = false;
     if (state.settings.invertMode === 'auto') {
       shouldInvert = avgPerimeterBrightness > 120; // light background, dark ink -> invert
@@ -544,7 +740,6 @@
       elements.invertStateVal.textContent = 'Forced Keep';
     }
 
-    // Convert pixels to grayscale and apply contrast
     const grayData = new Float32Array(totalPixels);
     const contrast = state.settings.contrast;
 
@@ -562,7 +757,6 @@
 
       grayData[i] = gray;
 
-      // Update image data for display on Stage 2 canvas
       data[idx] = gray;
       data[idx + 1] = gray;
       data[idx + 2] = gray;
@@ -571,7 +765,7 @@
 
     procCtx.putImageData(imgData, 0, 0);
 
-    // Render to Stage 2 preview
+    // Render Stage 2 preview
     const grayCanvas = elements.grayCanvas;
     const grayCtx = grayCanvas.getContext('2d');
     grayCtx.clearRect(0, 0, grayCanvas.width, grayCanvas.height);
@@ -588,14 +782,13 @@
     mnistCtx.fillRect(0, 0, 28, 28);
 
     if (state.settings.alignMode === 'direct') {
-      // Direct resize: simply scale the grayscale canvas to 28x28
       mnistCtx.drawImage(procCanvas, 0, 0, 28, 28);
       elements.stageAlignVal.textContent = 'Direct 28×28';
     } else {
       // Smart MNIST Centering:
       // 1. Threshold to find bounding box of digit ink
       let minX = pw, maxX = -1, minY = ph, maxY = -1;
-      const inkThreshold = 35; // noise floor
+      const inkThreshold = 35;
 
       for (let y = 0; y < ph; y++) {
         for (let x = 0; x < pw; x++) {
@@ -625,14 +818,12 @@
         const fitW = Math.max(1, Math.round(boxW * scale));
         const fitH = Math.max(1, Math.round(boxH * scale));
 
-        // Center inside 28x28
         const posX = Math.round((28 - fitW) / 2);
         const posY = Math.round((28 - fitH) / 2);
 
         mnistCtx.drawImage(digitCanvas, 0, 0, boxW, boxH, posX, posY, fitW, fitH);
         elements.stageAlignVal.textContent = 'Smart Center';
       } else {
-        // Fallback if no digit ink detected
         mnistCtx.drawImage(procCanvas, 0, 0, 28, 28);
         elements.stageAlignVal.textContent = 'Direct (Low Ink)';
       }
@@ -643,14 +834,14 @@
     // -------------------------------------------------------------
     const finalImgData = mnistCtx.getImageData(0, 0, 28, 28);
     const finalPixels = finalImgData.data;
-    const inputVector = new Float32Array(784); // 28 * 28 = 784
+    const inputVector = new Float32Array(784);
     let nonZeroCount = 0;
 
     for (let i = 0; i < 784; i++) {
       const r = finalPixels[i * 4];
       const g = finalPixels[i * 4 + 1];
       const b = finalPixels[i * 4 + 2];
-      const val = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0; // Normalized [0.0, 1.0]
+      const val = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
 
       inputVector[i] = val;
       if (val > 0.05) nonZeroCount++;
@@ -658,14 +849,14 @@
 
     elements.nonZeroCount.textContent = `${nonZeroCount} / 784`;
 
-    // Render Vector Mini-Heatmap on Stage 4
+    // Render Vector Mini-Heatmap on Stage 4 (Clean tensor monochrome/emerald)
     renderVectorHeatmap(inputVector);
 
     // -------------------------------------------------------------
     // STAGE 5 & 6: Neural Forward Pass (W · x + b) & Softmax
     // -------------------------------------------------------------
-    const weights = state.model.weights; // shape: [10][784]
-    const biases = state.model.biases;   // shape: [10]
+    const weights = state.model.weights; // [10][784]
+    const biases = state.model.biases;   // [10]
 
     const logits = new Float32Array(10);
     const dotProducts = new Float32Array(10);
@@ -680,7 +871,7 @@
       logits[c] = dot + biases[c];
     }
 
-    // Softmax probabilities: P(c) = exp(z_c - max(z)) / sum(exp(z_k - max(z)))
+    // Softmax probabilities
     let maxLogit = logits[0];
     for (let c = 1; c < 10; c++) {
       if (logits[c] > maxLogit) maxLogit = logits[c];
@@ -711,7 +902,7 @@
     renderPredictionResults(predictedClass, probabilities, logits, dotProducts, biases);
   }
 
-  // Render Vector Heatmap
+  // Render Vector Heatmap (Monochrome tensor display, no purple/blue gradients)
   function renderVectorHeatmap(vector) {
     const canvas = elements.vectorHeatmapCanvas;
     const ctx = canvas.getContext('2d');
@@ -723,13 +914,14 @@
     for (let y = 0; y < 28; y++) {
       for (let x = 0; x < 28; x++) {
         const val = vector[y * 28 + x];
-        // Blue to Cyan/Emerald gradient for active features
-        if (val < 0.01) {
-          ctx.fillStyle = '#080c14';
+        if (val < 0.02) {
+          ctx.fillStyle = '#0a0c10';
         } else {
-          const r = Math.round(99 * (1 - val));
-          const g = Math.round(102 + (185 - 102) * val);
-          const b = Math.round(241 * val);
+          // Sharp scientific tensor luminance with crisp emerald accent
+          const intensity = Math.min(255, Math.round(val * 255));
+          const r = Math.round(intensity * 0.3);
+          const g = Math.round(intensity);
+          const b = Math.round(intensity * 0.65);
           ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         }
         ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
