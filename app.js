@@ -1,21 +1,23 @@
 /**
  * ColdLogic - Handwritten Digit Classifier
  * 100% Client-Side Machine Learning Pipeline
- * Compatible with GitHub Pages (Zero Backend)
+ * With Human Data Labeling & In-Browser Fine-Tuning
  */
 
 (function () {
   'use strict';
 
+  const STORAGE_KEY = 'coldlogic_mnist_dataset_v1';
+
   // --- Global Application State ---
   const state = {
     model: null,
-    currentSource: null, // HTMLImageElement or HTMLCanvasElement
+    currentSource: null,
     currentSourceName: 'Sample 0',
     activeTab: 'upload',
     settings: {
-      alignMode: 'smart', // 'smart' or 'direct'
-      invertMode: 'auto', // 'auto', 'invert', 'keep'
+      alignMode: 'smart',
+      invertMode: 'auto',
       contrast: 1.4,
     },
     isDrawing: false,
@@ -25,9 +27,14 @@
     debounceTimer: null,
     camera: {
       stream: null,
-      facingMode: 'environment', // Start with rear/environment camera for paper scanning
+      facingMode: 'environment',
       isActive: false
-    }
+    },
+    // Active Learning & Data Labeling
+    currentInputVector: null,
+    currentWinner: null,
+    currentConfidence: 0,
+    dataset: []
   };
 
   // --- DOM Elements ---
@@ -39,6 +46,9 @@
     deployModal: document.getElementById('deployModal'),
     closeDeployModalBtn: document.getElementById('closeDeployModalBtn'),
     gotItModalBtn: document.getElementById('gotItModalBtn'),
+
+    // Hero Dataset Indicator
+    heroDatasetCount: document.getElementById('heroDatasetCount'),
 
     // Tabs
     tabUploadBtn: document.getElementById('tabUploadBtn'),
@@ -88,6 +98,7 @@
     resetSettingsBtn: document.getElementById('resetSettingsBtn'),
 
     // Prediction Output
+    resultsCard: document.getElementById('resultsCard'),
     heroPredictionCard: document.getElementById('heroPredictionCard'),
     predictedNumber: document.getElementById('predictedNumber'),
     confidenceValue: document.getElementById('confidenceValue'),
@@ -96,6 +107,20 @@
     distMaxNote: document.getElementById('distMaxNote'),
     probabilityBars: document.getElementById('probabilityBars'),
     logitsTableBody: document.getElementById('logitsTableBody'),
+
+    // Data Labeling & Dataset Management
+    labelingCard: document.getElementById('labelingCard'),
+    confirmCorrectBtn: document.getElementById('confirmCorrectBtn'),
+    quickDigitText: document.getElementById('quickDigitText'),
+    digitChipsGrid: document.getElementById('digitChipsGrid'),
+    labelStatusToast: document.getElementById('labelStatusToast'),
+    labelStatusMsg: document.getElementById('labelStatusMsg'),
+    datasetCounterBadge: document.getElementById('datasetCounterBadge'),
+    datasetCountLabel: document.getElementById('datasetCountLabel'),
+    exportDatasetBtn: document.getElementById('exportDatasetBtn'),
+    btnDatasetCount: document.getElementById('btnDatasetCount'),
+    trainBrowserBtn: document.getElementById('trainBrowserBtn'),
+    clearDatasetBtn: document.getElementById('clearDatasetBtn'),
 
     // Pipeline Stages
     rawPreviewCanvas: document.getElementById('rawPreviewCanvas'),
@@ -112,8 +137,9 @@
     stageWinnerVal: document.getElementById('stageWinnerVal')
   };
 
-  // --- Initialize App ---
+  // --- Initialize Application ---
   async function initApp() {
+    loadSavedDataset();
     initModel();
     initTabs();
     initUpload();
@@ -121,6 +147,7 @@
     initDrawingCanvas();
     initSamples();
     initSettings();
+    initLabelingControls();
     initModal();
     initPasteHandler();
 
@@ -130,33 +157,76 @@
     }, 100);
   }
 
+  // --- Dataset Persistence ---
+  function loadSavedDataset() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        state.dataset = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Could not read from localStorage:', e);
+      state.dataset = [];
+    }
+    updateDatasetUI();
+  }
+
+  function saveDatasetToStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.dataset));
+    } catch (e) {
+      console.warn('Could not save to localStorage (quota or disabled):', e);
+    }
+    updateDatasetUI();
+  }
+
+  function updateDatasetUI() {
+    const count = state.dataset.length;
+    const label = `${count} ${count === 1 ? 'sample' : 'samples'} saved`;
+    if (elements.datasetCountLabel) elements.datasetCountLabel.textContent = label;
+    if (elements.heroDatasetCount) elements.heroDatasetCount.textContent = count;
+    if (elements.btnDatasetCount) elements.btnDatasetCount.textContent = count;
+
+    const hasData = count > 0;
+    if (elements.exportDatasetBtn) elements.exportDatasetBtn.disabled = !hasData;
+    if (elements.trainBrowserBtn) elements.trainBrowserBtn.disabled = !hasData;
+    if (elements.clearDatasetBtn) elements.clearDatasetBtn.disabled = !hasData;
+  }
+
   // --- Model Loader ---
   async function initModel() {
     try {
       if (window.MODEL_DATA && window.MODEL_DATA.weights && window.MODEL_DATA.biases) {
-        state.model = window.MODEL_DATA;
+        // Deep copy weights and biases so user in-browser training does not mutate raw file globals
+        state.model = {
+          weights: window.MODEL_DATA.weights.map(row => Array.from(row)),
+          biases: Array.from(window.MODEL_DATA.biases)
+        };
         onModelLoaded();
         return;
       }
 
-      // Fallback: fetch model.json
       elements.modelStatusText.textContent = 'Fetching model.json...';
       const response = await fetch('model.json');
       if (!response.ok) throw new Error('Failed to load model.json');
-      state.model = await response.json();
+      const loaded = await response.json();
+      state.model = {
+        weights: loaded.weights.map(row => Array.from(row)),
+        biases: Array.from(loaded.biases)
+      };
       onModelLoaded();
     } catch (err) {
       console.error('Error loading model weights:', err);
       elements.modelStatusPill.classList.remove('status-ready');
       elements.modelStatusPill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
       elements.modelStatusPill.style.color = '#ef4444';
-      elements.modelStatusText.textContent = 'Model Loading Failed';
+      elements.modelStatusText.textContent = 'Load Failed';
     }
   }
 
   function onModelLoaded() {
     elements.modelStatusPill.classList.add('status-ready');
-    elements.modelStatusText.textContent = `Model Ready · 10×784 Weights · 10 Biases`;
+    elements.modelStatusText.textContent = `Model Ready`;
   }
 
   // --- Tab Navigation ---
@@ -183,7 +253,7 @@
         tab.pane.classList.add('active');
         state.activeTab = tab.id;
 
-        // Auto stop camera when leaving camera tab
+        // Auto stop camera when leaving camera tab to save battery
         if (prevTab === 'camera' && tab.id !== 'camera') {
           stopCamera();
         }
@@ -257,7 +327,7 @@
           const item = e.clipboardData.items[i];
           if (item.type.indexOf('image') !== -1) {
             const blob = item.getAsFile();
-            handleFile(blob, 'Pasted Clipboard Image');
+            handleFile(blob, 'Pasted Image');
             elements.tabUploadBtn.click();
             break;
           }
@@ -322,14 +392,13 @@
 
   async function startCamera() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showCameraError('Camera API Not Supported', 'Your browser does not support WebRTC camera access. Use Phone Shutter instead.');
+      showCameraError('Camera Not Supported', 'Your browser does not support camera streaming. Use Phone Shutter instead.');
       return;
     }
 
-    elements.cameraStatusText.textContent = 'Connecting Camera...';
-    elements.cameraStatusSub.textContent = 'Please allow browser camera permissions if prompted.';
+    elements.cameraStatusText.textContent = 'Connecting...';
+    elements.cameraStatusSub.textContent = 'Please allow camera permission if requested.';
 
-    // Stop any existing stream
     if (state.camera.stream) {
       state.camera.stream.getTracks().forEach(track => track.stop());
       state.camera.stream = null;
@@ -347,7 +416,6 @@
           audio: false
         });
       } catch (err) {
-        // Fallback to generic video constraint if facingMode constraint fails
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false
@@ -358,7 +426,6 @@
       state.camera.isActive = true;
       elements.cameraVideo.srcObject = stream;
 
-      // Adjust mirroring (mirror front/user camera for natural feel)
       if (state.camera.facingMode === 'user') {
         elements.cameraVideo.style.transform = 'scaleX(-1)';
       } else {
@@ -371,8 +438,8 @@
         elements.capturePhotoBtn.disabled = false;
       };
     } catch (err) {
-      console.warn('Camera access denied or failed:', err);
-      showCameraError('Camera Access Denied', 'Camera permission was denied or camera is in use. You can use the Phone Shutter or upload an image.');
+      console.warn('Camera access denied:', err);
+      showCameraError('Camera Denied', 'Permission was denied or camera is in use. You can use the Phone Shutter or upload an image.');
     }
   }
 
@@ -386,7 +453,7 @@
     elements.capturePhotoBtn.disabled = true;
 
     elements.cameraStatusText.textContent = 'Camera Inactive';
-    elements.cameraStatusSub.textContent = 'Activate live camera or use your phone\'s native camera shutter.';
+    elements.cameraStatusSub.textContent = 'Start live camera or use your phone\'s native camera shutter.';
     elements.cameraIdleOverlay.classList.remove('hidden');
   }
 
@@ -409,18 +476,19 @@
       return;
     }
 
-    // Trigger visual shutter flash
+    if (navigator.vibrate) navigator.vibrate(40);
+
+    // Visual shutter flash
     elements.cameraFlash.classList.add('flash-active');
     setTimeout(() => {
       elements.cameraFlash.classList.remove('flash-active');
-    }, 320);
+    }, 300);
 
     const video = elements.cameraVideo;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    // Crop to the centered reticle viewfinder area (~60% of the shorter side)
-    // This removes desk clutter and focuses directly on the handwritten digit!
+    // Crop to the centered reticle viewfinder area (~62% of the shorter side)
     const cropSize = Math.round(Math.min(vw, vh) * 0.62);
     const cropX = Math.round((vw - cropSize) / 2);
     const cropY = Math.round((vh - cropSize) / 2);
@@ -430,7 +498,6 @@
     canvas.height = cropSize;
     const ctx = canvas.getContext('2d');
 
-    // Handle user camera mirroring
     if (state.camera.facingMode === 'user') {
       ctx.translate(cropSize, 0);
       ctx.scale(-1, 1);
@@ -438,11 +505,10 @@
 
     ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
 
-    // Send the cropped camera frame straight to the ML pipeline!
     processSource(canvas, 'Camera Snapshot');
   }
 
-  // --- Interactive Drawing Canvas ---
+  // --- Interactive Drawing Canvas (With Mobile Touch-Lock) ---
   function initDrawingCanvas() {
     const canvas = elements.drawingCanvas;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -468,8 +534,13 @@
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-      const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      let clientX = e.clientX;
+      let clientY = e.clientY;
+
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      }
 
       return {
         x: (clientX - rect.left) * scaleX,
@@ -487,7 +558,7 @@
 
     function draw(e) {
       if (!state.isDrawing) return;
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
 
       const coords = getCoords(e);
 
@@ -515,10 +586,26 @@
       }
     }
 
+    // Pointer events (modern desktop & touch)
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     window.addEventListener('pointerup', stopDrawing);
     window.addEventListener('pointercancel', stopDrawing);
+
+    // Explicit touch listeners with passive: false to prevent mobile screen bouncing/scrolling while drawing
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.cancelable) e.preventDefault();
+      startDrawing(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.cancelable) e.preventDefault();
+      draw(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      stopDrawing();
+    }, { passive: false });
   }
 
   function debouncedProcessDrawing() {
@@ -615,6 +702,165 @@
     }
   }
 
+  // --- Active Learning: Data Labeling Controls ---
+  function initLabelingControls() {
+    // 1-Tap Quick Confirmation
+    elements.confirmCorrectBtn.addEventListener('click', () => {
+      if (state.currentWinner === null) return;
+      saveCurrentSample(state.currentWinner);
+    });
+
+    // 0-9 Chip Selector Grid
+    const chips = elements.digitChipsGrid.querySelectorAll('.digit-chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('active-picked'));
+        chip.classList.add('active-picked');
+
+        const label = parseInt(chip.dataset.digit, 10);
+        saveCurrentSample(label);
+      });
+    });
+
+    // Download Dataset (.json)
+    elements.exportDatasetBtn.addEventListener('click', exportDatasetAsJson);
+
+    // In-Browser Gradient Descent Fine-Tuning
+    elements.trainBrowserBtn.addEventListener('click', trainModelInBrowser);
+
+    // Clear Dataset
+    elements.clearDatasetBtn.addEventListener('click', () => {
+      if (state.dataset.length === 0) return;
+      if (confirm(`Clear all ${state.dataset.length} saved training samples?`)) {
+        state.dataset = [];
+        saveDatasetToStorage();
+        showToast('Dataset cleared.');
+      }
+    });
+  }
+
+  function saveCurrentSample(label) {
+    if (!state.currentInputVector) {
+      alert('Please provide an input image, photo, or drawing first.');
+      return;
+    }
+
+    if (navigator.vibrate) navigator.vibrate(30);
+
+    const sample = {
+      id: 'sample_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      label: label,
+      predicted: state.currentWinner,
+      confidence: Number((state.currentConfidence * 100).toFixed(1)),
+      vector: Array.from(state.currentInputVector), // 784 normalized [0.0, 1.0]
+      timestamp: Date.now(),
+      source: state.currentSourceName
+    };
+
+    state.dataset.push(sample);
+    saveDatasetToStorage();
+
+    showToast(`✓ Saved sample labeled as Digit ${label}! (Total: ${state.dataset.length})`);
+  }
+
+  function showToast(message) {
+    elements.labelStatusMsg.textContent = message;
+    elements.labelStatusToast.style.display = 'flex';
+    clearTimeout(elements.labelStatusToast._timer);
+    elements.labelStatusToast._timer = setTimeout(() => {
+      elements.labelStatusToast.style.display = 'none';
+    }, 4000);
+  }
+
+  function exportDatasetAsJson() {
+    if (state.dataset.length === 0) {
+      alert('No labeled samples to export yet.');
+      return;
+    }
+
+    const payload = {
+      version: 1,
+      modelType: 'Softmax Linear Regression',
+      format: 'MNIST 784 Normalized Pixels [0.0, 1.0]',
+      exportedAt: new Date().toISOString(),
+      sampleCount: state.dataset.length,
+      samples: state.dataset
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mnist_user_dataset_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // --- In-Browser Gradient Descent Fine-Tuning ---
+  // Mirrors new.py's update_weights_and_biases directly in JavaScript
+  function trainModelInBrowser() {
+    if (state.dataset.length === 0) {
+      alert('Save at least 1 labeled sample before training.');
+      return;
+    }
+
+    const lr = 0.08;
+    const epochs = 5;
+    const samples = state.dataset;
+
+    for (let epoch = 0; epoch < epochs; epoch++) {
+      for (let s = 0; s < samples.length; s++) {
+        const item = samples[s];
+        const x = item.vector; // 784
+        const y = item.label;  // 0-9
+
+        // 1. Forward Pass Logits: z = W · x + b
+        const z = new Float32Array(10);
+        for (let c = 0; c < 10; c++) {
+          let dot = 0.0;
+          for (let j = 0; j < 784; j++) {
+            dot += state.model.weights[c][j] * x[j];
+          }
+          z[c] = dot + state.model.biases[c];
+        }
+
+        // 2. Softmax probabilities
+        let maxZ = z[0];
+        for (let c = 1; c < 10; c++) if (z[c] > maxZ) maxZ = z[c];
+
+        let sumExp = 0.0;
+        const probs = new Float32Array(10);
+        for (let c = 0; c < 10; c++) {
+          probs[c] = Math.exp(z[c] - maxZ);
+          sumExp += probs[c];
+        }
+        for (let c = 0; c < 10; c++) probs[c] /= sumExp;
+
+        // 3. Gradient dz = (probs - one_hot)
+        for (let c = 0; c < 10; c++) {
+          const oneHot = (c === y) ? 1.0 : 0.0;
+          const dz = probs[c] - oneHot;
+
+          // Update bias
+          state.model.biases[c] -= lr * dz;
+
+          // Update weights
+          for (let j = 0; j < 784; j++) {
+            state.model.weights[c][j] -= lr * dz * x[j];
+          }
+        }
+      }
+    }
+
+    // Re-evaluate current input to see immediate accuracy improvement
+    reprocessCurrent();
+
+    if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+    showToast(`Model fine-tuned on ${samples.length} samples (${epochs} epochs)!`);
+  }
+
   // --- Modal (Deploy Guide) ---
   function initModal() {
     elements.deployGuideBtn.addEventListener('click', () => {
@@ -667,7 +913,6 @@
     rawCtx.fillStyle = '#000000';
     rawCtx.fillRect(0, 0, rawCanvas.width, rawCanvas.height);
 
-    // Aspect ratio fit
     const aspect = width / height;
     let drawW = rawCanvas.width;
     let drawH = rawCanvas.height;
@@ -727,10 +972,9 @@
 
     const avgPerimeterBrightness = perimeterSum / Math.max(1, perimeterCount);
 
-    // Inversion decision
     let shouldInvert = false;
     if (state.settings.invertMode === 'auto') {
-      shouldInvert = avgPerimeterBrightness > 120; // light background, dark ink -> invert
+      shouldInvert = avgPerimeterBrightness > 120;
       elements.invertStateVal.textContent = shouldInvert ? 'Auto (Inverted)' : 'Auto (Kept)';
     } else if (state.settings.invertMode === 'invert') {
       shouldInvert = true;
@@ -751,7 +995,6 @@
         gray = 255.0 - gray;
       }
 
-      // Apply contrast boost centered around 128
       gray = (gray - 128.0) * contrast + 128.0;
       gray = Math.max(0, Math.min(255, gray));
 
@@ -785,8 +1028,6 @@
       mnistCtx.drawImage(procCanvas, 0, 0, 28, 28);
       elements.stageAlignVal.textContent = 'Direct 28×28';
     } else {
-      // Smart MNIST Centering:
-      // 1. Threshold to find bounding box of digit ink
       let minX = pw, maxX = -1, minY = ph, maxY = -1;
       const inkThreshold = 35;
 
@@ -806,14 +1047,12 @@
       const boxH = maxY - minY + 1;
 
       if (boxW > 3 && boxH > 3) {
-        // Cut out digit
         const digitCanvas = document.createElement('canvas');
         digitCanvas.width = boxW;
         digitCanvas.height = boxH;
         const digitCtx = digitCanvas.getContext('2d');
         digitCtx.drawImage(procCanvas, minX, minY, boxW, boxH, 0, 0, boxW, boxH);
 
-        // Fit digit into a 20x20 box inside the 28x28 canvas (MNIST specification)
         const scale = 20.0 / Math.max(boxW, boxH);
         const fitW = Math.max(1, Math.round(boxW * scale));
         const fitH = Math.max(1, Math.round(boxH * scale));
@@ -847,16 +1086,16 @@
       if (val > 0.05) nonZeroCount++;
     }
 
+    state.currentInputVector = inputVector;
     elements.nonZeroCount.textContent = `${nonZeroCount} / 784`;
 
-    // Render Vector Mini-Heatmap on Stage 4 (Clean tensor monochrome/emerald)
     renderVectorHeatmap(inputVector);
 
     // -------------------------------------------------------------
     // STAGE 5 & 6: Neural Forward Pass (W · x + b) & Softmax
     // -------------------------------------------------------------
-    const weights = state.model.weights; // [10][784]
-    const biases = state.model.biases;   // [10]
+    const weights = state.model.weights;
+    const biases = state.model.biases;
 
     const logits = new Float32Array(10);
     const dotProducts = new Float32Array(10);
@@ -871,7 +1110,6 @@
       logits[c] = dot + biases[c];
     }
 
-    // Softmax probabilities
     let maxLogit = logits[0];
     for (let c = 1; c < 10; c++) {
       if (logits[c] > maxLogit) maxLogit = logits[c];
@@ -896,13 +1134,13 @@
       }
     }
 
-    // -------------------------------------------------------------
-    // Render Results & UI Visualizations
-    // -------------------------------------------------------------
+    state.currentWinner = predictedClass;
+    state.currentConfidence = maxProb;
+
     renderPredictionResults(predictedClass, probabilities, logits, dotProducts, biases);
   }
 
-  // Render Vector Heatmap (Monochrome tensor display, no purple/blue gradients)
+  // Render Vector Heatmap
   function renderVectorHeatmap(vector) {
     const canvas = elements.vectorHeatmapCanvas;
     const ctx = canvas.getContext('2d');
@@ -917,7 +1155,6 @@
         if (val < 0.02) {
           ctx.fillStyle = '#0a0c10';
         } else {
-          // Sharp scientific tensor luminance with crisp emerald accent
           const intensity = Math.min(255, Math.round(val * 255));
           const r = Math.round(intensity * 0.3);
           const g = Math.round(intensity);
@@ -929,14 +1166,14 @@
     }
   }
 
-  // Render Prediction Dashboard
+  // Render Prediction Dashboard & Update Labeling Prompt
   function renderPredictionResults(winner, probs, logits, dotProducts, biases) {
     const confidencePct = (probs[winner] * 100).toFixed(1);
 
     // Hero Card
     elements.predictedNumber.textContent = winner;
     elements.predictedNumber.classList.remove('animate-pop');
-    void elements.predictedNumber.offsetWidth; // Trigger reflow
+    void elements.predictedNumber.offsetWidth;
     elements.predictedNumber.classList.add('animate-pop');
 
     elements.confidenceValue.textContent = `${confidencePct}%`;
@@ -947,7 +1184,17 @@
     elements.miniPredictedConf.textContent = `${confidencePct}%`;
     elements.stageWinnerVal.textContent = `Digit ${winner}`;
 
-    // Top 3 Candidates
+    // Update Quick Confirm Button in Data Labeling Card
+    if (elements.quickDigitText) {
+      elements.quickDigitText.textContent = winner;
+    }
+
+    // Reset any active selection on chips
+    if (elements.digitChipsGrid) {
+      elements.digitChipsGrid.querySelectorAll('.digit-chip').forEach(c => c.classList.remove('active-picked'));
+    }
+
+    // Top Candidates
     const ranked = Array.from({ length: 10 }, (_, i) => ({
       digit: i,
       prob: probs[i],

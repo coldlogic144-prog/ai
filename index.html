@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>ColdLogic · Handwritten Digit Classifier</title>
-  <meta name="description" content="Precision client-side Machine Learning Handwritten Digit Classifier. Real-time preprocessing pipeline running 100% locally in your browser.">
-  <meta name="theme-color" content="#0e1013">
+  <meta name="description" content="Precision client-side Machine Learning Handwritten Digit Classifier with real-time human data labeling and training dataset collection.">
+  <meta name="theme-color" content="#0c0d10">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
     <header class="top-nav" id="topNav">
       <div class="brand">
         <div class="brand-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
             <line x1="3" y1="9" x2="21" y2="9"/>
             <line x1="9" y1="21" x2="9" y2="9"/>
@@ -28,23 +28,23 @@
         </div>
         <div class="brand-text">
           <span class="brand-title">ColdLogic</span>
-          <span class="brand-sub">MNIST Digit Classifier</span>
+          <span class="brand-sub">Digit Classifier</span>
         </div>
       </div>
 
       <div class="nav-badges">
-        <div class="status-pill status-ready" id="modelStatusPill">
+        <div class="status-pill status-ready" id="modelStatusPill" title="Local Softmax Model Ready">
           <span class="status-dot"></span>
-          <span id="modelStatusText">Model Ready · 784 Inputs</span>
+          <span id="modelStatusText">Model Ready</span>
         </div>
-        <div class="status-pill github-pages-pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <div class="status-pill github-pages-pill desktop-only">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
-          <span>Static Client Engine</span>
+          <span>Static Client</span>
         </div>
         <button class="btn btn-ghost btn-sm" id="deployGuideBtn" title="How to host on GitHub Pages">
-          Deploy Guide
+          Deploy
         </button>
       </div>
     </header>
@@ -55,17 +55,17 @@
       <section class="hero-section">
         <div class="hero-badge">
           <span class="badge-dot"></span>
-          <span>Zero Server · 100% In-Browser Inference</span>
+          <span>100% In-Browser ML &middot; Real-Time Data Labeling</span>
         </div>
-        <h1 class="hero-title">Handwritten Digit Classification</h1>
+        <h1 class="hero-title">Handwritten Digit Classifier</h1>
         <p class="hero-desc">
-          Capture with your camera, upload a photo, or draw a digit live. Inspect each mathematical phase of preprocessing into the exact trained neural weights in real time.
+          Capture with camera, upload a photo, or draw a digit. Confirm or correct predictions to build a training dataset for fine-tuning.
         </p>
         <div class="tech-spec-bar">
-          <span class="spec-tag"><strong>Architecture:</strong> Softmax Linear Regression</span>
+          <span class="spec-tag"><strong>Architecture:</strong> Softmax Linear</span>
           <span class="spec-tag"><strong>Weights:</strong> 10 &times; 784</span>
-          <span class="spec-tag"><strong>Biases:</strong> 10 params</span>
-          <span class="spec-tag"><strong>Latency:</strong> &lt; 2ms Client-Side</span>
+          <span class="spec-tag"><strong>Latency:</strong> &lt; 2ms</span>
+          <span class="spec-tag dataset-tag" id="heroDatasetTag"><strong>Dataset:</strong> <span id="heroDatasetCount">0</span> saved</span>
         </div>
       </section>
 
@@ -78,19 +78,19 @@
             <div class="tab-controls" role="tablist">
               <button class="tab-btn active" id="tabUploadBtn" data-tab="upload" role="tab" aria-selected="true">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Upload File
+                <span>Upload</span>
               </button>
               <button class="tab-btn" id="tabCameraBtn" data-tab="camera" role="tab" aria-selected="false">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                Camera
+                <span>Camera</span>
               </button>
               <button class="tab-btn" id="tabDrawBtn" data-tab="draw" role="tab" aria-selected="false">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-                Draw Digit
+                <span>Draw</span>
               </button>
               <button class="tab-btn" id="tabSamplesBtn" data-tab="samples" role="tab" aria-selected="false">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Samples
+                <span>Samples</span>
               </button>
             </div>
           </div>
@@ -102,14 +102,14 @@
                 <input type="file" id="fileInput" accept="image/*" class="visually-hidden">
                 <div class="dropzone-content">
                   <div class="dropzone-icon">
-                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                       <circle cx="8.5" cy="8.5" r="1.5"/>
                       <polyline points="21 15 16 10 5 21"/>
                     </svg>
                   </div>
                   <h3 class="dropzone-title">Drop your digit image here</h3>
-                  <p class="dropzone-sub">PNG, JPG, JPEG, WEBP or paste from clipboard (Ctrl+V)</p>
+                  <p class="dropzone-sub">Supports PNG, JPG, WEBP, or paste (Ctrl+V)</p>
                   <div class="dropzone-actions">
                     <button type="button" class="btn btn-primary" id="browseFileBtn">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -117,7 +117,7 @@
                     </button>
                     <button type="button" class="btn btn-secondary" id="quickCameraBtn">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      Use Camera
+                      Open Camera
                     </button>
                   </div>
                 </div>
@@ -138,7 +138,7 @@
                       <span class="reticle-corner corner-bl"></span>
                       <span class="reticle-corner corner-br"></span>
                       <div class="reticle-crosshair"></div>
-                      <span class="reticle-label">Position single digit inside</span>
+                      <span class="reticle-label">Align single digit inside box</span>
                     </div>
                   </div>
 
@@ -148,17 +148,17 @@
                   <!-- Idle / Permissions Overlay -->
                   <div class="camera-overlay-state" id="cameraIdleOverlay">
                     <div class="overlay-icon">
-                      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                         <circle cx="12" cy="13" r="4"/>
                       </svg>
                     </div>
                     <p class="overlay-title" id="cameraStatusText">Camera Inactive</p>
-                    <p class="overlay-sub" id="cameraStatusSub">Activate live camera or use your phone's native camera shutter.</p>
+                    <p class="overlay-sub" id="cameraStatusSub">Start live camera or use your phone's native camera shutter.</p>
                     <div class="overlay-buttons">
                       <button type="button" class="btn btn-primary" id="startCameraBtn">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                        Start Live Camera
+                        Start Camera
                       </button>
                       <button type="button" class="btn btn-secondary" id="deviceCameraBtn">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -179,14 +179,14 @@
                   </button>
                   <button type="button" class="btn btn-secondary btn-sm" id="flipCameraBtn" title="Switch between front and back camera">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    Flip
+                    <span>Flip</span>
                   </button>
                   <button type="button" class="btn btn-secondary btn-sm" id="nativeShutterToolbarBtn" title="Use mobile camera shutter">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    Phone App
+                    <span>App</span>
                   </button>
                   <button type="button" class="btn btn-ghost btn-sm" id="stopCameraBtn" title="Turn camera off">
-                    Stop
+                    <span>Stop</span>
                   </button>
                 </div>
               </div>
@@ -197,7 +197,7 @@
               <div class="draw-container">
                 <div class="canvas-wrapper">
                   <canvas id="drawingCanvas" width="280" height="280"></canvas>
-                  <span class="canvas-hint">Draw a single digit (0-9) inside this box</span>
+                  <span class="canvas-hint">Touch or drag to draw a single digit (0-9)</span>
                 </div>
                 <div class="draw-toolbar">
                   <div class="tool-group">
@@ -215,61 +215,66 @@
             <!-- TAB 4: Samples Gallery -->
             <div class="tab-pane" id="paneSamples">
               <div class="samples-wrapper">
-                <p class="section-hint">Select any test sample to push it through the pipeline:</p>
+                <p class="section-hint">Tap any sample digit to classify:</p>
                 <div class="samples-grid" id="samplesGrid">
                   <!-- Injected via samples.js -->
                 </div>
               </div>
             </div>
 
-            <!-- Pipeline Tuning & Settings Bar -->
-            <div class="pipeline-settings-panel">
-              <div class="settings-header">
+            <!-- Pipeline Tuning & Settings Bar (Collapsible for cleaner mobile UX) -->
+            <details class="pipeline-settings-panel" id="settingsDetails">
+              <summary class="settings-summary">
                 <span class="settings-title">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                  Pipeline Calibration
+                  Preprocessing Calibration
                 </span>
-                <button class="btn btn-link btn-xs" id="resetSettingsBtn">Reset Defaults</button>
-              </div>
+                <span class="settings-toggle-hint">Settings &darr;</span>
+              </summary>
 
-              <div class="settings-grid">
-                <div class="setting-item">
-                  <label for="alignModeSelect" class="setting-label">Centering Mode</label>
-                  <select id="alignModeSelect" class="form-select">
-                    <option value="smart" selected>Smart MNIST Alignment (Auto-Center & Crop)</option>
-                    <option value="direct">Direct Resize 28&times;28 (No Centering)</option>
-                  </select>
-                </div>
-
-                <div class="setting-item">
-                  <label for="invertSelect" class="setting-label">Background & Invert</label>
-                  <select id="invertSelect" class="form-select">
-                    <option value="auto" selected>Auto-Detect (Paper vs Screen)</option>
-                    <option value="invert">Invert (Dark Ink on White Paper)</option>
-                    <option value="keep">Keep (Bright Ink on Dark Screen)</option>
-                  </select>
-                </div>
-
-                <div class="setting-item full-width">
-                  <div class="slider-header">
-                    <label for="contrastRange" class="setting-label">Ink Contrast Boost</label>
-                    <span id="contrastVal" class="mono-tag">1.4x</span>
+              <div class="settings-content">
+                <div class="settings-grid">
+                  <div class="setting-item">
+                    <label for="alignModeSelect" class="setting-label">Centering Mode</label>
+                    <select id="alignModeSelect" class="form-select">
+                      <option value="smart" selected>Smart Center (20&times;20 in 28&times;28)</option>
+                      <option value="direct">Direct Resize (No Centering)</option>
+                    </select>
                   </div>
-                  <input type="range" id="contrastRange" min="1.0" max="3.0" step="0.1" value="1.4" class="slider-sm">
+
+                  <div class="setting-item">
+                    <label for="invertSelect" class="setting-label">Background & Invert</label>
+                    <select id="invertSelect" class="form-select">
+                      <option value="auto" selected>Auto-Detect Paper vs Screen</option>
+                      <option value="invert">Invert (Dark Ink on White Paper)</option>
+                      <option value="keep">Keep (Bright Ink on Dark Screen)</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-item full-width">
+                    <div class="slider-header">
+                      <label for="contrastRange" class="setting-label">Ink Contrast Boost</label>
+                      <span id="contrastVal" class="mono-tag">1.4x</span>
+                    </div>
+                    <input type="range" id="contrastRange" min="1.0" max="3.0" step="0.1" value="1.4" class="slider-sm">
+                  </div>
+                </div>
+                <div class="settings-actions">
+                  <button type="button" class="btn btn-link btn-xs" id="resetSettingsBtn">Reset Defaults</button>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
 
         <!-- Right Column: Live Model Prediction & Distribution -->
-        <div class="workspace-card results-card">
+        <div class="workspace-card results-card" id="resultsCard">
           <div class="card-header">
             <h2 class="card-title">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-              ML Prediction Result
+              Prediction &amp; Labeling
             </h2>
-            <span class="badge badge-success" id="inferenceBadge">Inference Done</span>
+            <span class="badge badge-success" id="inferenceBadge">Evaluated</span>
           </div>
 
           <div class="card-body">
@@ -285,15 +290,79 @@
                   <span class="stat-val stat-confidence" id="confidenceValue">0.0%</span>
                 </div>
                 <div class="pred-stat">
-                  <span class="stat-label">Top 3 Candidates</span>
+                  <span class="stat-label">Top Candidates</span>
                   <div class="stat-chips" id="topThreeChips">
                     <span class="chip chip-empty">-</span>
                   </div>
                 </div>
                 <div class="pred-stat">
-                  <span class="stat-label">Decision Rule</span>
+                  <span class="stat-label">Decision Formula</span>
                   <span class="stat-val mono-tag">argmax(W &middot; x + b)</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- HUMAN DATA LABELING & ACTIVE LEARNING SECTION -->
+            <div class="labeling-card" id="labelingCard">
+              <div class="labeling-header">
+                <div class="labeling-title-group">
+                  <span class="labeling-badge">Dataset Collection</span>
+                  <h3 class="labeling-title">Label This Digit to Train</h3>
+                </div>
+                <span class="dataset-counter-badge" id="datasetCounterBadge" title="Saved labeled samples">
+                  <span class="counter-dot"></span>
+                  <span id="datasetCountLabel">0 saved</span>
+                </span>
+              </div>
+
+              <p class="labeling-desc">
+                Help improve the model! Confirm this prediction or tap the correct digit (0–9) to save it for retraining.
+              </p>
+
+              <!-- Quick 1-Tap Confirm Button -->
+              <div class="quick-confirm-row">
+                <button type="button" class="btn btn-confirm-correct" id="confirmCorrectBtn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Confirm Digit <strong id="quickDigitText">?</strong></span>
+                </button>
+              </div>
+
+              <!-- Manual 0-9 Digit Selector Chips -->
+              <div class="manual-digit-picker">
+                <span class="picker-label">Or choose actual digit if incorrect:</span>
+                <div class="digit-chips-grid" id="digitChipsGrid">
+                  <button type="button" class="digit-chip" data-digit="0">0</button>
+                  <button type="button" class="digit-chip" data-digit="1">1</button>
+                  <button type="button" class="digit-chip" data-digit="2">2</button>
+                  <button type="button" class="digit-chip" data-digit="3">3</button>
+                  <button type="button" class="digit-chip" data-digit="4">4</button>
+                  <button type="button" class="digit-chip" data-digit="5">5</button>
+                  <button type="button" class="digit-chip" data-digit="6">6</button>
+                  <button type="button" class="digit-chip" data-digit="7">7</button>
+                  <button type="button" class="digit-chip" data-digit="8">8</button>
+                  <button type="button" class="digit-chip" data-digit="9">9</button>
+                </div>
+              </div>
+
+              <!-- Feedback Confirmation Message -->
+              <div class="label-status-toast" id="labelStatusToast" style="display: none;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span id="labelStatusMsg">Saved sample as Digit ?</span>
+              </div>
+
+              <!-- Dataset Management & Export Toolbar -->
+              <div class="dataset-toolbar">
+                <button type="button" class="btn btn-secondary btn-sm" id="exportDatasetBtn" disabled title="Download JSON training dataset for Python new.py">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Download (<span id="btnDatasetCount">0</span>)</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="trainBrowserBtn" disabled title="Fine-tune weights directly in your browser">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  <span>Train Now</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs text-dim" id="clearDatasetBtn" disabled>
+                  Clear
+                </button>
               </div>
             </div>
 
@@ -339,14 +408,17 @@
       <!-- FULL INTERACTIVE PIPELINE VISUALIZER -->
       <section class="pipeline-section">
         <div class="section-title-wrap">
-          <div class="pipeline-meta-tag">6 Mathematical Stages</div>
+          <div class="pipeline-meta-tag">Interactive Preprocessing Pipeline</div>
           <h2 class="section-title">The Complete Processing Pipeline</h2>
           <p class="section-desc">
             Observe the input frame transformed step-by-step from raw optical pixels into normalized feature space and linear logit evaluation.
           </p>
+          <div class="mobile-swipe-hint">
+            <span>&larr; Swipe cards to view all 6 stages &rarr;</span>
+          </div>
         </div>
 
-        <div class="pipeline-flow">
+        <div class="pipeline-flow" id="pipelineFlow">
           <!-- Stage 1: Input -->
           <div class="pipeline-card" id="stage1Card">
             <div class="stage-tag">Stage 01</div>
@@ -396,7 +468,7 @@
           <!-- Stage 4: 784 Normalized Vector -->
           <div class="pipeline-card" id="stage4Card">
             <div class="stage-tag">Stage 04</div>
-            <h3 class="stage-title">784 Feature Vector</h3>
+            <h3 class="stage-title">784 Vector</h3>
             <div class="stage-canvas-box">
               <canvas id="vectorHeatmapCanvas" width="112" height="112"></canvas>
             </div>
@@ -428,7 +500,7 @@
           <!-- Stage 6: Softmax & Decision -->
           <div class="pipeline-card active-stage" id="stage6Card">
             <div class="stage-tag stage-tag-success">Stage 06</div>
-            <h3 class="stage-title">Argmax Decision</h3>
+            <h3 class="stage-title">Decision</h3>
             <div class="stage-result-box">
               <div class="mini-pred-number" id="miniPredictedNum">?</div>
               <div class="mini-pred-conf" id="miniPredictedConf">0%</div>
