@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ColdLogic AI · Handwritten Digit Recognizer</title>
+  <meta name="description" content="Client-side Machine Learning Handwritten Digit Recognition with real-time image processing pipeline. Runs 100% in your browser on GitHub Pages.">
+  <meta name="theme-color" content="#090d16">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <div class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav" id="topNav">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="9" y1="21" x2="9" y2="9"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ColdLogic AI</span>
+          <span class="brand-sub">MNIST Digit Pipeline</span>
+        </div>
+      </div>
+
+      <div class="nav-badges">
+        <div class="status-pill status-ready" id="modelStatusPill">
+          <span class="status-dot"></span>
+          <span id="modelStatusText">Model Ready · 784 Inputs</span>
+        </div>
+        <div class="status-pill github-pages-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>100% Static · GitHub Pages</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="deployGuideBtn" title="How to host on GitHub Pages">
+          Deploy Guide
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <!-- Hero Header -->
+      <section class="hero-section">
+        <h1 class="hero-title">Handwritten Digit <span class="gradient-text">Classification Pipeline</span></h1>
+        <p class="hero-desc">
+          Upload any photo of a handwritten number or draw one live. Watch it flow step-by-step through our image preprocessing pipeline into the exact trained neural model weights — running 100% client-side with zero backend.
+        </p>
+        <div class="tech-spec-bar">
+          <span class="spec-tag"><strong>Architecture:</strong> Softmax Linear Regression</span>
+          <span class="spec-tag"><strong>Weights:</strong> 10 &times; 784 (7,840 params)</span>
+          <span class="spec-tag"><strong>Biases:</strong> 10 params</span>
+          <span class="spec-tag"><strong>Latency:</strong> &lt; 2ms Client-Side</span>
+        </div>
+      </section>
+
+      <!-- Primary Workspace: Two-column responsive layout -->
+      <div class="workspace-grid">
+
+        <!-- Left Column: Input Modalities & Controls -->
+        <div class="workspace-card input-card">
+          <div class="card-header">
+            <div class="tab-controls" role="tablist">
+              <button class="tab-btn active" id="tabUploadBtn" data-tab="upload" role="tab" aria-selected="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload Image
+              </button>
+              <button class="tab-btn" id="tabDrawBtn" data-tab="draw" role="tab" aria-selected="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                Draw Digit
+              </button>
+              <button class="tab-btn" id="tabSamplesBtn" data-tab="samples" role="tab" aria-selected="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Sample Gallery
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- TAB 1: Upload Image -->
+            <div class="tab-pane active" id="paneUpload">
+              <div class="dropzone" id="dropzone">
+                <input type="file" id="fileInput" accept="image/*" class="visually-hidden">
+                <div class="dropzone-content">
+                  <div class="dropzone-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                  <h3 class="dropzone-title">Drag & drop your digit image</h3>
+                  <p class="dropzone-sub">Supports PNG, JPG, JPEG, WEBP or paste from clipboard (Ctrl+V)</p>
+                  <button type="button" class="btn btn-primary" id="browseFileBtn">
+                    Browse File
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 2: Draw Digit -->
+            <div class="tab-pane" id="paneDraw">
+              <div class="draw-container">
+                <div class="canvas-wrapper">
+                  <canvas id="drawingCanvas" width="280" height="280"></canvas>
+                  <span class="canvas-hint">Draw a single digit (0-9) inside this box</span>
+                </div>
+                <div class="draw-toolbar">
+                  <div class="tool-group">
+                    <label for="brushSize" class="label-sm">Stroke Size:</label>
+                    <input type="range" id="brushSize" min="14" max="36" value="22" class="slider-sm">
+                    <span id="brushSizeVal" class="mono-tag">22px</span>
+                  </div>
+                  <div class="tool-actions">
+                    <button class="btn btn-ghost btn-sm" id="clearCanvasBtn">Clear</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 3: Samples Gallery -->
+            <div class="tab-pane" id="paneSamples">
+              <div class="samples-wrapper">
+                <p class="section-hint">Click any verified MNIST test sample to push it through the pipeline:</p>
+                <div class="samples-grid" id="samplesGrid">
+                  <!-- Injected via JavaScript from samples.js -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Pipeline Tuning & Settings Bar -->
+            <div class="pipeline-settings-panel">
+              <div class="settings-header">
+                <span class="settings-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  Pipeline Preprocessing Settings
+                </span>
+                <button class="btn btn-link btn-xs" id="resetSettingsBtn">Reset Defaults</button>
+              </div>
+
+              <div class="settings-grid">
+                <div class="setting-item">
+                  <label for="alignModeSelect" class="setting-label">Centering Mode</label>
+                  <select id="alignModeSelect" class="form-select">
+                    <option value="smart" selected>Smart MNIST Alignment (Auto-Center & Crop)</option>
+                    <option value="direct">Direct Resize 28&times;28 (No Centering)</option>
+                  </select>
+                </div>
+
+                <div class="setting-item">
+                  <label for="invertSelect" class="setting-label">Background & Invert</label>
+                  <select id="invertSelect" class="form-select">
+                    <option value="auto" selected>Auto-Detect (Paper vs Screen)</option>
+                    <option value="invert">Invert (Dark Ink on White Paper)</option>
+                    <option value="keep">Keep (Bright Ink on Dark Screen)</option>
+                  </select>
+                </div>
+
+                <div class="setting-item full-width">
+                  <div class="slider-header">
+                    <label for="contrastRange" class="setting-label">Ink Contrast Boost</label>
+                    <span id="contrastVal" class="mono-tag">1.4x</span>
+                  </div>
+                  <input type="range" id="contrastRange" min="1.0" max="3.0" step="0.1" value="1.4" class="slider-sm">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Live Model Prediction & Distribution -->
+        <div class="workspace-card results-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+              ML Prediction Result
+            </h2>
+            <span class="badge badge-pulse" id="inferenceBadge">Inference Done</span>
+          </div>
+
+          <div class="card-body">
+            <!-- Hero Prediction Banner -->
+            <div class="hero-prediction" id="heroPredictionCard">
+              <div class="prediction-left">
+                <span class="pred-label">PREDICTED DIGIT</span>
+                <div class="pred-number-glow" id="predictedNumber">?</div>
+              </div>
+              <div class="prediction-right">
+                <div class="pred-stat">
+                  <span class="stat-label">Confidence</span>
+                  <span class="stat-val stat-confidence" id="confidenceValue">0.0%</span>
+                </div>
+                <div class="pred-stat">
+                  <span class="stat-label">Top 3 Candidates</span>
+                  <div class="stat-chips" id="topThreeChips">
+                    <span class="chip chip-empty">-</span>
+                  </div>
+                </div>
+                <div class="pred-stat">
+                  <span class="stat-label">Model Logic</span>
+                  <span class="stat-val mono-tag">argmax(W &middot; x + b)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Softmax Probability Distribution Bars (Digits 0-9) -->
+            <div class="distribution-section">
+              <div class="dist-header">
+                <span class="dist-title">Softmax Probability Distribution (Classes 0-9)</span>
+                <span class="dist-note" id="distMaxNote">Class ? highest</span>
+              </div>
+              <div class="bars-container" id="probabilityBars">
+                <!-- 10 bars generated by app.js -->
+              </div>
+            </div>
+
+            <!-- Collapsible Raw Logits Inspector -->
+            <details class="logits-details" id="logitsAccordion">
+              <summary class="logits-summary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                Inspect Raw Output Logits (Z<sub>0</sub> to Z<sub>9</sub>)
+              </summary>
+              <div class="logits-table-wrapper">
+                <table class="logits-table" id="logitsTable">
+                  <thead>
+                    <tr>
+                      <th>Class</th>
+                      <th>Bias (b<sub>i</sub>)</th>
+                      <th>Dot Product (W<sub>i</sub> &middot; x)</th>
+                      <th>Logit (z<sub>i</sub>)</th>
+                      <th>Softmax P(i)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logitsTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FULL INTERACTIVE PIPELINE VISUALIZER -->
+      <section class="pipeline-section">
+        <div class="section-title-wrap">
+          <h2 class="section-title">
+            <span class="step-num">Step-by-Step</span> The Complete ML Image Pipeline
+          </h2>
+          <p class="section-desc">
+            See exactly how your uploaded image is transformed through each mathematical phase before being passed into the model.
+          </p>
+        </div>
+
+        <div class="pipeline-flow">
+          <!-- Stage 1: Input -->
+          <div class="pipeline-card" id="stage1Card">
+            <div class="stage-tag">Stage 1</div>
+            <h3 class="stage-title">Raw Input</h3>
+            <div class="stage-canvas-box">
+              <canvas id="rawPreviewCanvas" width="112" height="112"></canvas>
+            </div>
+            <div class="stage-meta" id="rawMeta">
+              <span>Size: <strong id="rawSizeVal">-- &times; --</strong></span>
+              <span>Source: <strong id="rawSourceVal">None</strong></span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">&rarr;</div>
+
+          <!-- Stage 2: Grayscale & Contrast -->
+          <div class="pipeline-card" id="stage2Card">
+            <div class="stage-tag">Stage 2</div>
+            <h3 class="stage-title">Grayscale & Invert</h3>
+            <div class="stage-canvas-box">
+              <canvas id="grayCanvas" width="112" height="112"></canvas>
+            </div>
+            <div class="stage-meta">
+              <span>Formula: <strong>0.3R+0.59G+0.11B</strong></span>
+              <span>Inverted: <strong id="invertStateVal">Auto</strong></span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">&rarr;</div>
+
+          <!-- Stage 3: Centered 28x28 Canvas -->
+          <div class="pipeline-card" id="stage3Card">
+            <div class="stage-tag">Stage 3</div>
+            <h3 class="stage-title">28 &times; 28 MNIST Grid</h3>
+            <div class="stage-canvas-box pixelated-box">
+              <canvas id="mnistCanvas" width="28" height="28"></canvas>
+              <div class="zoom-badge">Zoomed 4&times;</div>
+            </div>
+            <div class="stage-meta">
+              <span>Pixels: <strong>28 &times; 28 = 784</strong></span>
+              <span>Mode: <strong id="stageAlignVal">Smart Center</strong></span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">&rarr;</div>
+
+          <!-- Stage 4: 784 Normalized Vector -->
+          <div class="pipeline-card" id="stage4Card">
+            <div class="stage-tag">Stage 4</div>
+            <h3 class="stage-title">784 Feature Vector</h3>
+            <div class="stage-canvas-box">
+              <canvas id="vectorHeatmapCanvas" width="112" height="112"></canvas>
+            </div>
+            <div class="stage-meta">
+              <span>Range: <strong>[0.0, 1.0]</strong></span>
+              <span>Non-zero: <strong id="nonZeroCount">-- / 784</strong></span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">&rarr;</div>
+
+          <!-- Stage 5: Dot Product & Biases -->
+          <div class="pipeline-card" id="stage5Card">
+            <div class="stage-tag">Stage 5</div>
+            <h3 class="stage-title">Linear Layer</h3>
+            <div class="math-box">
+              <div class="math-eq">z<sub>i</sub> = &sum; W<sub>ij</sub> &middot; x<sub>j</sub> + b<sub>i</sub></div>
+              <div class="math-desc">Weights: 10 &times; 784</div>
+              <div class="math-desc">Biases: 10 &times; 1</div>
+            </div>
+            <div class="stage-meta">
+              <span>Output: <strong>10 Logits</strong></span>
+              <span>Status: <strong class="text-success">Evaluated</strong></span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">&rarr;</div>
+
+          <!-- Stage 6: Softmax & Decision -->
+          <div class="pipeline-card active-stage" id="stage6Card">
+            <div class="stage-tag stage-tag-success">Stage 6</div>
+            <h3 class="stage-title">Argmax Decision</h3>
+            <div class="stage-result-box">
+              <div class="mini-pred-number" id="miniPredictedNum">?</div>
+              <div class="mini-pred-conf" id="miniPredictedConf">0%</div>
+            </div>
+            <div class="stage-meta">
+              <span>Function: <strong>&sigma;(z) &amp; argmax</strong></span>
+              <span>Winner: <strong id="stageWinnerVal">Digit ?</strong></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Deploy Guide Modal -->
+      <dialog class="deploy-modal" id="deployModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              How to Host on GitHub Pages
+            </h2>
+            <button class="btn-close" id="closeDeployModalBtn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p>This web application is 100% static client-side HTML, CSS, and JavaScript. No servers, node backends, or Firebase required!</p>
+            <ol class="deploy-steps">
+              <li>
+                <strong>Push your code to GitHub:</strong>
+                <code>git init && git add . && git commit -m "Add ML Web Interface" && git branch -M main</code>
+                <code>git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git</code>
+                <code>git push -u origin main</code>
+              </li>
+              <li>
+                <strong>Enable GitHub Pages in Repository Settings:</strong>
+                <p>Go to your repository on GitHub &rarr; <strong>Settings</strong> &rarr; <strong>Pages</strong> (on left sidebar).</p>
+              </li>
+              <li>
+                <strong>Select Branch and Folder:</strong>
+                <p>Under <strong>Build and deployment &gt; Branch</strong>, select <code>main</code> and folder <code>/ (root)</code>, then click <strong>Save</strong>.</p>
+              </li>
+              <li>
+                <strong>Done!</strong>
+                <p>Within ~60 seconds, your site will be live at: <code>https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/</code></p>
+              </li>
+            </ol>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" id="gotItModalBtn">Got It</button>
+          </div>
+        </div>
+      </dialog>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p>ColdLogic AI &middot; MNIST Handwritten Digit Recognizer &middot; Built with Vanilla HTML5 Canvas &amp; JavaScript</p>
+        <p class="footer-note">All weights loaded directly from <code>digit_model.npz</code> &middot; 0 API calls &middot; 0 External tracking</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Scripts: First Model Data & Sample Digits, then Main App Controller -->
+  <script src="model_data.js"></script>
+  <script src="samples.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
