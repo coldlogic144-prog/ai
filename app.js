@@ -1,7 +1,7 @@
 /**
  * ColdLogic - Handwritten Digit Classifier
  * 100% Client-Side Machine Learning Pipeline
- * With Human Data Labeling & In-Browser Fine-Tuning
+ * With Automated Server Data Collection & Python Retraining
  */
 
 (function () {
@@ -120,7 +120,23 @@
     exportDatasetBtn: document.getElementById('exportDatasetBtn'),
     btnDatasetCount: document.getElementById('btnDatasetCount'),
     trainBrowserBtn: document.getElementById('trainBrowserBtn'),
+    runPythonTrainBtn: document.getElementById('runPythonTrainBtn'),
     clearDatasetBtn: document.getElementById('clearDatasetBtn'),
+    autoSaveIndicator: document.getElementById('autoSaveIndicator'),
+
+    // Python Training Modal
+    trainingModal: document.getElementById('trainingModal'),
+    closeTrainingModalBtn: document.getElementById('closeTrainingModalBtn'),
+    finishTrainingBtn: document.getElementById('finishTrainingBtn'),
+    trainingStatusTitle: document.getElementById('trainingStatusTitle'),
+    trainingStatusDesc: document.getElementById('trainingStatusDesc'),
+    trainingSpinner: document.getElementById('trainingSpinner'),
+    trainingResultsGrid: document.getElementById('trainingResultsGrid'),
+    trainStatMnist: document.getElementById('trainStatMnist'),
+    trainStatUser: document.getElementById('trainStatUser'),
+    trainStatAcc: document.getElementById('trainStatAcc'),
+    trainStatTime: document.getElementById('trainStatTime'),
+    trainingNotice: document.getElementById('trainingNotice'),
 
     // Pipeline Stages
     rawPreviewCanvas: document.getElementById('rawPreviewCanvas'),
@@ -148,13 +164,42 @@
     initSamples();
     initSettings();
     initLabelingControls();
+    initPythonTraining();
     initModal();
     initPasteHandler();
+    checkServerStatus();
 
     // Load initial sample digit (0)
     setTimeout(() => {
       loadInitialDigit();
     }, 100);
+  }
+
+  // --- Check Backend Server Status ---
+  async function checkServerStatus() {
+    try {
+      const resp = await fetch('/api/status');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (elements.autoSaveIndicator) {
+          elements.autoSaveIndicator.innerHTML = '<span class="pulse-dot"></span> Auto-Collect (Disk)';
+          elements.autoSaveIndicator.style.borderColor = 'rgba(52, 211, 153, 0.4)';
+          elements.autoSaveIndicator.style.color = '#34d399';
+        }
+        if (data.user_samples_count && data.user_samples_count > state.dataset.length) {
+          elements.datasetCountLabel.textContent = `${data.user_samples_count} on disk`;
+          elements.heroDatasetCount.textContent = data.user_samples_count;
+          elements.btnDatasetCount.textContent = data.user_samples_count;
+        }
+      }
+    } catch (e) {
+      // Running on pure static file:// or GitHub Pages without local python server
+      if (elements.autoSaveIndicator) {
+        elements.autoSaveIndicator.innerHTML = '<span class="pulse-dot" style="background:#f59e0b;"></span> Auto-Save (Browser)';
+        elements.autoSaveIndicator.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        elements.autoSaveIndicator.style.color = '#fbbf24';
+      }
+    }
   }
 
   // --- Dataset Persistence ---
@@ -175,7 +220,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.dataset));
     } catch (e) {
-      console.warn('Could not save to localStorage (quota or disabled):', e);
+      console.warn('Could not save to localStorage:', e);
     }
     updateDatasetUI();
   }
@@ -197,7 +242,6 @@
   async function initModel() {
     try {
       if (window.MODEL_DATA && window.MODEL_DATA.weights && window.MODEL_DATA.biases) {
-        // Deep copy weights and biases so user in-browser training does not mutate raw file globals
         state.model = {
           weights: window.MODEL_DATA.weights.map(row => Array.from(row)),
           biases: Array.from(window.MODEL_DATA.biases)
@@ -371,7 +415,6 @@
       captureCameraPhoto();
     });
 
-    // Native mobile camera fallback triggers
     const triggerNativeShutter = () => {
       elements.nativeCameraInput.click();
     };
@@ -478,7 +521,6 @@
 
     if (navigator.vibrate) navigator.vibrate(40);
 
-    // Visual shutter flash
     elements.cameraFlash.classList.add('flash-active');
     setTimeout(() => {
       elements.cameraFlash.classList.remove('flash-active');
@@ -488,7 +530,6 @@
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    // Crop to the centered reticle viewfinder area (~62% of the shorter side)
     const cropSize = Math.round(Math.min(vw, vh) * 0.62);
     const cropX = Math.round((vw - cropSize) / 2);
     const cropY = Math.round((vh - cropSize) / 2);
@@ -586,13 +627,11 @@
       }
     }
 
-    // Pointer events (modern desktop & touch)
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     window.addEventListener('pointerup', stopDrawing);
     window.addEventListener('pointercancel', stopDrawing);
 
-    // Explicit touch listeners with passive: false to prevent mobile screen bouncing/scrolling while drawing
     canvas.addEventListener('touchstart', (e) => {
       if (e.cancelable) e.preventDefault();
       startDrawing(e);
@@ -603,7 +642,7 @@
       draw(e);
     }, { passive: false });
 
-    canvas.addEventListener('touchend', (e) => {
+    canvas.addEventListener('touchend', () => {
       stopDrawing();
     }, { passive: false });
   }
@@ -702,7 +741,7 @@
     }
   }
 
-  // --- Active Learning: Data Labeling Controls ---
+  // --- Active Learning: Data Labeling & Automatic Collection ---
   function initLabelingControls() {
     // 1-Tap Quick Confirmation
     elements.confirmCorrectBtn.addEventListener('click', () => {
@@ -739,7 +778,7 @@
     });
   }
 
-  function saveCurrentSample(label) {
+  async function saveCurrentSample(label) {
     if (!state.currentInputVector) {
       alert('Please provide an input image, photo, or drawing first.');
       return;
@@ -757,8 +796,27 @@
       source: state.currentSourceName
     };
 
+    // 1. Save in client state & localStorage
     state.dataset.push(sample);
     saveDatasetToStorage();
+
+    // 2. Automatically save directly to project disk via server API
+    try {
+      const resp = await fetch('/api/save_sample', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sample)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        showToast(`✓ Auto-saved & labeled as Digit ${label} on disk! (${data.total_samples} total)`);
+        if (elements.heroDatasetCount) elements.heroDatasetCount.textContent = data.total_samples;
+        if (elements.datasetCountLabel) elements.datasetCountLabel.textContent = `${data.total_samples} on disk`;
+        return;
+      }
+    } catch (err) {
+      // Local server not running or static mode - saved to localStorage
+    }
 
     showToast(`✓ Saved sample labeled as Digit ${label}! (Total: ${state.dataset.length})`);
   }
@@ -769,7 +827,7 @@
     clearTimeout(elements.labelStatusToast._timer);
     elements.labelStatusToast._timer = setTimeout(() => {
       elements.labelStatusToast.style.display = 'none';
-    }, 4000);
+    }, 4500);
   }
 
   function exportDatasetAsJson() {
@@ -798,8 +856,83 @@
     URL.revokeObjectURL(url);
   }
 
+  // --- Python Server Model Retraining (Single File train.py integration) ---
+  function initPythonTraining() {
+    if (!elements.runPythonTrainBtn) return;
+
+    elements.runPythonTrainBtn.addEventListener('click', async () => {
+      // Show training modal with animated spinner
+      elements.trainingStatusTitle.textContent = 'Retraining Model with Python...';
+      elements.trainingStatusDesc.textContent = 'Running train.py on combined MNIST dataset (data/mnist.npz) and your labeled samples...';
+      elements.trainingSpinner.style.display = 'block';
+      elements.trainingResultsGrid.style.display = 'none';
+      elements.trainingNotice.style.display = 'none';
+      elements.trainingModal.showModal();
+
+      try {
+        const response = await fetch('/api/train', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ epochs: 25, learning_rate: 0.08 })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Training failed');
+        }
+
+        // Live update in-browser weights without needing page refresh!
+        state.model = {
+          weights: result.weights.map(row => Array.from(row)),
+          biases: Array.from(result.biases)
+        };
+
+        // Render stats in modal
+        elements.trainingSpinner.style.display = 'none';
+        elements.trainingStatusTitle.textContent = '✓ Python Retraining Complete!';
+        elements.trainingStatusDesc.textContent = `Model trained on ${result.mnist_count.toLocaleString()} MNIST images + ${result.user_count} user samples in ${result.train_time_sec}s.`;
+        elements.trainingResultsGrid.style.display = 'grid';
+        elements.trainStatMnist.textContent = result.mnist_count.toLocaleString();
+        elements.trainStatUser.textContent = result.user_count.toLocaleString();
+        elements.trainStatAcc.textContent = `${result.final_mnist_acc}%`;
+        elements.trainStatTime.textContent = `${result.train_time_sec}s`;
+        elements.trainingNotice.style.display = 'block';
+
+        // Re-evaluate current active digit
+        reprocessCurrent();
+
+        if (navigator.vibrate) navigator.vibrate([50, 70, 50]);
+        showToast(`✓ Retrained with Python! (${result.epochs} epochs, ${result.final_mnist_acc}% test acc)`);
+      } catch (err) {
+        console.warn('Python server not responding:', err);
+        elements.trainingSpinner.style.display = 'none';
+        elements.trainingStatusTitle.textContent = 'Python Server Offline';
+        elements.trainingStatusDesc.innerHTML = `
+          The web page cannot reach <code>/api/train</code>.<br><br>
+          <strong>To enable Python retraining from the webpage:</strong>
+          <ol style="margin-top: 0.5rem; padding-left: 1.25rem;">
+            <li>In your terminal, start the server: <code>python train.py --serve</code></li>
+            <li>Or train directly from command line: <code>python train.py</code></li>
+          </ol>
+          <p style="margin-top: 0.6rem; color: #34d399;">You can also click <strong>Client Train</strong> to train immediately inside your browser right now!</p>
+        `;
+      }
+    });
+
+    elements.closeTrainingModalBtn.addEventListener('click', () => {
+      elements.trainingModal.close();
+    });
+
+    elements.finishTrainingBtn.addEventListener('click', () => {
+      elements.trainingModal.close();
+    });
+  }
+
   // --- In-Browser Gradient Descent Fine-Tuning ---
-  // Mirrors new.py's update_weights_and_biases directly in JavaScript
   function trainModelInBrowser() {
     if (state.dataset.length === 0) {
       alert('Save at least 1 labeled sample before training.');
@@ -813,10 +946,9 @@
     for (let epoch = 0; epoch < epochs; epoch++) {
       for (let s = 0; s < samples.length; s++) {
         const item = samples[s];
-        const x = item.vector; // 784
-        const y = item.label;  // 0-9
+        const x = item.vector;
+        const y = item.label;
 
-        // 1. Forward Pass Logits: z = W · x + b
         const z = new Float32Array(10);
         for (let c = 0; c < 10; c++) {
           let dot = 0.0;
@@ -826,7 +958,6 @@
           z[c] = dot + state.model.biases[c];
         }
 
-        // 2. Softmax probabilities
         let maxZ = z[0];
         for (let c = 1; c < 10; c++) if (z[c] > maxZ) maxZ = z[c];
 
@@ -838,15 +969,11 @@
         }
         for (let c = 0; c < 10; c++) probs[c] /= sumExp;
 
-        // 3. Gradient dz = (probs - one_hot)
         for (let c = 0; c < 10; c++) {
           const oneHot = (c === y) ? 1.0 : 0.0;
           const dz = probs[c] - oneHot;
 
-          // Update bias
           state.model.biases[c] -= lr * dz;
-
-          // Update weights
           for (let j = 0; j < 784; j++) {
             state.model.weights[c][j] -= lr * dz * x[j];
           }
@@ -854,7 +981,6 @@
       }
     }
 
-    // Re-evaluate current input to see immediate accuracy improvement
     reprocessCurrent();
 
     if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
@@ -948,7 +1074,6 @@
     const data = imgData.data;
     const totalPixels = procCanvas.width * procCanvas.height;
 
-    // Detect perimeter background brightness to determine if white paper
     let perimeterSum = 0;
     let perimeterCount = 0;
     const pw = procCanvas.width;
@@ -1008,7 +1133,6 @@
 
     procCtx.putImageData(imgData, 0, 0);
 
-    // Render Stage 2 preview
     const grayCanvas = elements.grayCanvas;
     const grayCtx = grayCanvas.getContext('2d');
     grayCtx.clearRect(0, 0, grayCanvas.width, grayCanvas.height);

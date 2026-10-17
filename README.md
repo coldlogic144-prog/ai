@@ -57,17 +57,32 @@ https://YOUR_USERNAME.github.io/YOUR_REPOSITORY_NAME/
 
 ---
 
-## 🧠 Retraining with Collected User Data
+## 🧠 Retraining with Collected User Data (Unified `train.py`)
 
-When users label digits on the website, they can download `mnist_user_dataset.json`. To retrain the Python model with this data:
+`train.py` is the all-in-one Python training and server file. It combines baseline MNIST data (`data/mnist.npz`) with custom user-labeled samples (`data/user_samples.json`) to train the model without catastrophic forgetting.
 
-1. Place the downloaded `mnist_user_dataset.json` in this directory.
-2. Run:
-   ```powershell
-   python train_user_data.py
-   ```
-3. The script will:
-   - Load baseline weights from `models/digit_model.npz`.
-   - Run gradient descent on your labeled handwriting samples.
-   - Save the updated model to `models/digit_model_updated.npz`.
-   - Automatically update `model_data.js` and `model.json` for the web app!
+### Option 1: Live Web App with Auto-Data Collection & Web Retraining (Recommended)
+Start the local server:
+```powershell
+python train.py --serve
+```
+1. Open `http://localhost:8080/` in your browser.
+2. Draw or upload digits, then confirm or pick the correct digit (0–9).
+3. Every labeled digit is **automatically collected and saved to `data/user_samples.json` on disk**.
+4. Click **"Run Python Training"** on the webpage.
+5. The webpage triggers `train.py`, retrains the model on baseline MNIST + your custom data in ~1 second, updates `models/digit_model.npz`, `model.json`, and `model_data.js`, and hot-reloads the weights into the browser live without refreshing!
+
+### Option 2: Train Directly from Terminal
+```powershell
+python train.py
+```
+Or customize epochs and learning rate:
+```powershell
+python train.py --epochs 30 --lr 0.08
+```
+
+### Option 3: Static / In-Browser Training (GitHub Pages)
+Even if hosted statically on GitHub Pages without a Python server:
+- Labeled digits save locally in browser storage.
+- Click **"Client Train"** to execute gradient descent directly in JavaScript inside the browser.
+- Click **"Export"** to download your dataset as a JSON file anytime.

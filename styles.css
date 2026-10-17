@@ -1,6 +1,6 @@
 /* ColdLogic - Precision Handwritten Digit Classifier
    Aesthetic: Clean Modern Engineering & Product UI (No blue/purple gradients or sci-fi glows)
-   Optimized for Desktop and Mobile Touch Screens
+   Optimized for Desktop, Tablet, and Mobile Screens
 */
 
 :root {
@@ -353,7 +353,7 @@ body {
   display: block;
 }
 
-/* TAB 1: Dropzone */
+/* Dropzone (Upload) */
 .dropzone {
   border: 2px dashed rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-md);
@@ -423,7 +423,7 @@ body {
   border: 0;
 }
 
-/* TAB 2: Camera Viewfinder & Controls */
+/* Camera Viewfinder */
 .camera-container {
   display: flex;
   flex-direction: column;
@@ -450,7 +450,6 @@ body {
   background: #000000;
 }
 
-/* Viewfinder Reticle Overlay */
 .viewfinder-overlay {
   position: absolute;
   inset: 0;
@@ -518,7 +517,6 @@ body {
   border-radius: var(--radius-xs);
 }
 
-/* Shutter Flash Animation */
 .camera-flash {
   position: absolute;
   inset: 0;
@@ -537,7 +535,6 @@ body {
   100% { opacity: 0; }
 }
 
-/* Idle / Error Overlay in Viewfinder */
 .camera-overlay-state {
   position: absolute;
   inset: 0;
@@ -591,7 +588,6 @@ body {
   justify-content: center;
 }
 
-/* Camera Controls Toolbar */
 .camera-toolbar {
   display: flex;
   align-items: center;
@@ -617,7 +613,7 @@ body {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
-/* TAB 3: Draw Canvas */
+/* Draw Canvas */
 .draw-container {
   display: flex;
   flex-direction: column;
@@ -664,7 +660,7 @@ body {
   gap: 0.45rem;
 }
 
-/* TAB 4: Samples Gallery */
+/* Samples Gallery */
 .samples-wrapper {
   display: flex;
   flex-direction: column;
@@ -722,7 +718,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Pipeline Tuning & Settings Panel (Collapsible) */
+/* Settings Panel (Collapsible) */
 .pipeline-settings-panel {
   margin-top: 0.25rem;
   background: var(--bg-subtle);
@@ -823,7 +819,7 @@ body {
   margin-top: 0.5rem;
 }
 
-/* Results Card & Prediction */
+/* Prediction Output */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -841,7 +837,6 @@ body {
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-/* Hero Prediction Readout Box (Precision Instrument Panel) */
 .hero-prediction {
   display: flex;
   align-items: center;
@@ -947,7 +942,7 @@ body {
 }
 
 /* =========================================================================
-   HUMAN DATA LABELING & DATASET COLLECTION CARD
+   HUMAN DATA LABELING & ACTIVE LEARNING SECTION
    ========================================================================= */
 .labeling-card {
   background: var(--bg-subtle);
@@ -964,6 +959,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .labeling-title-group {
@@ -983,6 +979,32 @@ body {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
+}
+
+.auto-save-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  font-size: 0.68rem;
+  color: var(--color-success-bright);
+  font-family: var(--font-mono);
+}
+
+.pulse-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-success-bright);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
 }
 
 .labeling-title {
@@ -1126,6 +1148,16 @@ body {
   gap: 0.5rem;
   margin-top: 0.2rem;
   flex-wrap: wrap;
+}
+
+.btn-python-train {
+  background: #ffffff !important;
+  color: #0c0d10 !important;
+  font-weight: 700 !important;
+}
+
+.btn-python-train:hover {
+  background: #e2e4e8 !important;
 }
 
 /* Distribution Telemetry Bars */
@@ -1283,9 +1315,7 @@ body {
   background: var(--color-success-bg);
 }
 
-/* =========================================================================
-   PIPELINE VISUALIZER SECTION
-   ========================================================================= */
+/* Pipeline Visualizer Section */
 .pipeline-section {
   margin-top: 0.5rem;
   margin-bottom: 3.5rem;
@@ -1590,7 +1620,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Deploy Guide Modal */
+/* Modal Dialogs */
 .deploy-modal {
   margin: auto;
   border: none;
@@ -1688,6 +1718,91 @@ body {
   justify-content: flex-end;
 }
 
+/* Python Training Modal Specifics */
+.training-status-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0;
+  gap: 0.65rem;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.training-status-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.training-status-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  max-width: 440px;
+  line-height: 1.5;
+}
+
+.training-results-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.train-stat-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-num {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-success-bright);
+}
+
+.stat-name {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+}
+
+.training-notice {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--color-success-bg);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.training-notice code {
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
 /* Footer */
 .app-footer {
   margin-top: auto;
@@ -1709,7 +1824,7 @@ body {
 }
 
 /* =========================================================================
-   COMPREHENSIVE MOBILE SCREEN RESPONSIVENESS & TOUCH OPTIMIZATIONS
+   COMPREHENSIVE MOBILE RESPONSIVENESS
    ========================================================================= */
 
 @media (max-width: 980px) {
@@ -1756,7 +1871,6 @@ body {
     padding: 0.25rem 0.55rem;
   }
 
-  /* Make tab control smooth and comfortable on touch */
   .tab-controls {
     gap: 0.2rem;
   }
@@ -1772,7 +1886,6 @@ body {
     gap: 1rem;
   }
 
-  /* Viewfinder height on tablet/mobile */
   .camera-viewfinder {
     height: 250px;
   }
@@ -1782,7 +1895,6 @@ body {
     height: 155px;
   }
 
-  /* Hero Prediction on mobile */
   .hero-prediction {
     padding: 1rem;
     gap: 1rem;
@@ -1797,7 +1909,6 @@ body {
     font-size: 3.8rem;
   }
 
-  /* Labeling digits grid for tablets */
   .digit-chips-grid {
     gap: 0.25rem;
   }
@@ -1807,7 +1918,6 @@ body {
     font-size: 0.9rem;
   }
 
-  /* Pipeline horizontal scrolling with snap */
   .mobile-swipe-hint {
     display: block;
   }
@@ -1824,8 +1934,8 @@ body {
     padding: 0.75rem 0.5rem;
   }
 
-  .pipeline-arrow {
-    font-size: 0.95rem;
+  .training-results-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1842,7 +1952,6 @@ body {
     font-size: 0.84rem;
   }
 
-  /* Tab bar for small phones */
   .tab-btn {
     font-size: 0.74rem;
     padding: 0.45rem 0.2rem;
@@ -1854,7 +1963,6 @@ body {
     height: 13px;
   }
 
-  /* Dropzone on small phone */
   .dropzone {
     padding: 1.5rem 0.85rem;
   }
@@ -1871,7 +1979,6 @@ body {
     width: 100%;
   }
 
-  /* Camera controls toolbar on small mobile */
   .camera-toolbar {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
@@ -1885,7 +1992,6 @@ body {
     font-size: 0.88rem;
   }
 
-  /* Draw Canvas */
   #drawingCanvas {
     width: 100%;
     max-width: 270px;
@@ -1898,7 +2004,6 @@ body {
     max-width: 270px;
   }
 
-  /* Stack Hero prediction if phone is under 420px */
   .hero-prediction {
     flex-direction: column;
     align-items: stretch;
@@ -1925,7 +2030,6 @@ body {
     justify-content: space-between;
   }
 
-  /* Digit Chips Grid 5x2 on small screens for easy finger tapping */
   .digit-chips-grid {
     grid-template-columns: repeat(5, 1fr);
     gap: 0.4rem;
@@ -1942,7 +2046,6 @@ body {
     font-size: 0.88rem;
   }
 
-  /* Dataset actions full width on phone */
   .dataset-toolbar {
     display: flex;
     flex-direction: column;
@@ -1955,7 +2058,6 @@ body {
     justify-content: center;
   }
 
-  /* Settings Grid 1 column on phone */
   .settings-grid {
     grid-template-columns: 1fr;
   }
