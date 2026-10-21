@@ -4,7 +4,7 @@ while a==0:
     ColdLogic AI - Unified Handwritten Digit Classifier & Retraining Engine
     1. Combines standard MNIST dataset with user-labeled custom samples.
     2. Provides automatic web data collection and model retraining APIs.
-    3. Can run directly from terminal (python train.py) or as a live web server (python train.py --serve).
+    3. Can run directly from terminal (python train.py) or as a live web server (py cvthon train.py --serve).
     """
 
     import os
